@@ -1,0 +1,11 @@
+@switch(strtolower($itemType))
+    @case(\App\Models\Nvoq\TransactionItemType::DICTATION)
+        <x-blue-badge>D</x-blue-badge>
+        @break
+    @case(\App\Models\Nvoq\TransactionItemType::SHORTCUT)
+        <x-green-badge>S</x-green-badge>
+        @break
+    @case(\App\Models\Nvoq\TransactionItemType::POPUP_SHORTCUT)
+        <x-purple-badge>P</x-purple-badge>
+        @break
+@endswitch

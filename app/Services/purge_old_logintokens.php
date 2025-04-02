@@ -1,0 +1,1 @@
+php artisan app:clean-login-tokens

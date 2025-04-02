@@ -1,0 +1,20 @@
+<?php
+
+namespace App\Models\Enums;
+
+enum GenAIRequestState : int
+{
+    case INTERNAL_GEN_AI_REQ_STATE_0_INIT = 0;
+    case INTERNAL_GEN_AI_REQ_STATE_1_TRX_ID_PARSED = 1;
+    case INTERNAL_GEN_AI_REQ_STATE_2_DOWNLOADED_TRX_AUDIO = 2; // download audio first using file system, as nvoq doesn't create trx data until it finish processing the audio transcription
+    case INTERNAL_GEN_AI_REQ_STATE_3_UPLOADED_TRX_AUDIO = 3;
+    case INTERNAL_GEN_AI_REQ_STATE_4_REQUESTED_TRANSCRIPTION = 4;
+    case INTERNAL_GEN_AI_REQ_STATE_5_RETRIEVED_TRX_DATA = 5;
+    case INTERNAL_GEN_AI_REQ_STATE_6_JOB_SET_AS_AI = 6;
+    case INTERNAL_GEN_AI_REQ_STATE_7_AI_JOB_SET_AS_NEW = 7;
+    case INTERNAL_GEN_AI_REQ_STATE_8_UPDATED_JOB_BODY = 8;
+    case INTERNAL_GEN_AI_REQ_STATE_9_DELETED_DATA_FROM_AI_SERVER = 9;
+    case INTERNAL_GEN_AI_REQ_STATE_10_AI_JOB_SET_AS_READY = 10;
+    case INTERNALL_GEN_AI_REQ_STATE_11_SUMMARY_REQUEST = 11;
+    //case INTERNAL_GEN_AI_REQ_STATE_10_FAILED = 9;
+}

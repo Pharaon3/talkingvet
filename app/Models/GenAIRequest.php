@@ -1,0 +1,261 @@
+<?php
+
+namespace App\Models;
+
+use App\Models\Enums\GenAIRequestState;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Crypt;
+use Ramsey\Uuid\Type\Integer;
+
+class GenAIRequest extends Model
+{
+    /**
+     * SoftDeletes : https://laravel.com/docs/10.x/eloquent#soft-deleting
+     */
+    use SerializesModels, SoftDeletes;
+
+    public $incrementing = false;
+    protected $keyType = 'string';
+    protected $primaryKey = 'trxId';
+    protected GenAIRequestState $state = GenAIRequestState::INTERNAL_GEN_AI_REQ_STATE_0_INIT;
+
+    /**
+     * The table associated with the model.
+     *
+     * @var string
+     */
+    protected $table = 'gen_ai_requests';
+
+    protected $fillable = [
+        /** nvoq link for audio transaction location
+         *
+         * example: /SCVmcServices/rest/transactions/rYvPROClRa-a2fkaogQkdQ/audio
+         */
+        'audioLocation',
+
+        /** public accessible downloaded audio path - CANCELLED - changed to assembly AI audio URL
+         *
+         * example: https://cdn.assemblyai.com/upload/6175b808-b36d-42ac-9ac6-cae3caxxxx
+         */
+        'audioUrl',
+
+        /** local audio file location w.r.t GenAIConfig::GEN_AI_STORAGE_NAME */
+        'localAudioFile' => "",
+
+        /** nvoq transaction id */
+        'trxId',
+
+        /** assembly AI job ID */
+        'assemblyAIJobId',
+
+        /** user account country */
+        'country',
+//        'token',
+
+        /** nvoq user username */
+        'username',
+
+        /** user nvoq base64 encoded auth string */
+        'userAuthString',
+
+        /** job state, one of: @see GenAIRequestState */
+        'state',
+
+        /** auto generate submission time */
+        'submitTime',
+
+        /** job is valid if audioLocation is valid and nvoq transaction ID was extracted from it successfully */
+        'valid',
+
+        /** retries counter before failing */
+        'retries',
+
+        /** errors counter during job processing - cleared if job passed */
+        'error',
+
+        'error_msg',
+    ];
+
+    /**
+     * The model's default values for attributes.
+     *
+     * @var array
+     */
+    protected $attributes = [
+        'audioLocation' => "",
+        'audioUrl' => "",
+        'assemblyAIJobId' => "",
+        'localAudioFile' => "",
+        'trxId' => "",
+        'country' => null,
+//        'token' => "",
+        'userAuthString' => "",
+        'state' => 0,
+        'submitTime' => "",
+        'valid' => false,
+//        'deleted_at' => "",
+        'retries' => 0,
+        'error' => 0,
+        'error_msg' => "",
+    ];
+
+    public $timestamps = false;
+
+    protected $casts = [
+        'submitTime' => 'datetime',
+        'retries' => 'integer',
+        'error' => 'integer',
+        'state' => GenAIRequestState::class
+    ];
+
+//    public function __construct(array $attributes = [])
+//    {
+//        $audioLocation = $attributes['audioLocation'];
+//        $country = $attributes['country'];
+//        $transactionId = null;
+//
+//        /* 0. parse audio url from request */
+//        $pattern = "/\/SCVmcServices\/rest\/transactions\/([^\/]+)\/audio/";
+//
+//        if (preg_match($pattern, $audioLocation, $matches)) {
+//            $transactionId = $matches[1]; // Access the captured group
+//            $attributes['valid'] = true;
+//        }
+//
+//        $this->trxId = $transactionId;
+//        $this->submitTime = Carbon::now();
+//        $this->audioUrl = config("app.nvoq_servers")[$country] . $audioLocation;
+//
+//        $this->fill($attributes);
+//
+//
+//    }
+
+
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (GenAIRequest $genAIRequest)
+        {
+            if (isset($genAIRequest->audioLocation))
+            {
+                $audioLocation = $genAIRequest->audioLocation;
+                $country = $genAIRequest->country;
+
+                $transactionId = null;
+
+                /* 0. parse audio url from request */
+                $pattern = "/\/SCVmcServices\/rest\/transactions\/([^\/]+)\/audio/";
+
+                if (preg_match($pattern, $audioLocation, $matches)) {
+                    $transactionId = $matches[1]; // Access the captured group
+                    $genAIRequest->valid = true;
+                }
+
+                $genAIRequest->trxId = $transactionId;
+                $genAIRequest->submitTime = Carbon::now();
+//                $genAIRequest->audioUrl = config("app.nvoq_servers")[$country] . $audioLocation;
+
+
+                // encrypt user authentication
+                $value = $genAIRequest->userAuthString;
+                $genAIRequest->userAuthString = Crypt::encrypt($value);
+
+            }
+        });
+    }
+
+    public function __get($key)
+    {
+        $value = parent::__get($key); // TODO: Change the autogenerated stub
+
+        if ($key === 'userAuthString' && $value) {
+            try {
+                $value = Crypt::decrypt($value);
+            } catch (\Exception $e) {
+                // Handle the exception if the decryption fails
+                // no change return db value for compatibility of old data (remove later)
+            }
+        }
+
+        return $value;
+    }
+
+/*    public function __set($key, $value)
+    {
+        if ($key === 'userAuthString') {
+            $value = Crypt::encrypt($value);
+        }
+
+        parent::__set($key, $value); // TODO: Change the autogenerated stub
+    }*/
+
+
+    public static function findByTrxId(string $trxId, bool $includeTrashed = false) : GenAIRequest|null
+    {
+        if($includeTrashed)
+        {
+            return GenAIRequest::withTrashed()->find($trxId);
+        }
+        else
+        {
+            return GenAIRequest::find($trxId);
+        }
+    }
+
+    public static function findByAudioLocation(string $audioLocation, bool $includeTrashed = true) : GenAIRequest|null
+    {
+        /* 0. parse audio url from request */
+        $pattern = "/\/SCVmcServices\/rest\/transactions\/([^\/]+)\/audio/";
+
+
+        if (preg_match($pattern, $audioLocation, $matches)) {
+            $transactionId = $matches[1]; // Access the captured group
+
+            if($includeTrashed)
+            {
+                return GenAIRequest::withTrashed()->find($transactionId);
+            }
+            else
+            {
+                return GenAIRequest::find($transactionId);
+            }
+        }
+
+        return null;
+    }
+
+//    public function create(array $attributes) : GenAIRequest
+//    {
+//        $this->fill($attributes);
+//
+//        if (isset($this->attributes['audioLocation']))
+//        {
+//            $audioLocation = $this->attributes['audioLocation'];
+//            $country = $this->attributes['country'];
+//
+//            $transactionId = null;
+//
+//            /* 0. parse audio url from request */
+//            $pattern = "/\/SCVmcServices\/rest\/transactions\/([^\/]+)\/audio/";
+//
+//            if (preg_match($pattern, $audioLocation, $matches)) {
+//                $transactionId = $matches[1]; // Access the captured group
+//                $this->attributes['valid'] = true;
+//            }
+//
+//            $this->attributes['trxId'] = $transactionId;
+//            $this->attributes['submitTime'] = Carbon::now();
+//            $this->attributes['audioUrl'] = config("app.nvoq_servers")[$country] . $audioLocation;
+//        }
+//
+//        return $this;
+//    }
+
+
+}

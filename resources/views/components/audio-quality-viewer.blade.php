@@ -1,0 +1,14 @@
+@switch($slot)
+    @case("1")
+        <x-red-badge>Poor</x-red-badge>
+    @break
+    @case("2")
+        <x-yellow-badge>Fair</x-yellow-badge>
+    @break
+    @case("3")
+        <x-green-badge>Good</x-green-badge>
+    @break
+    @case("4")
+        <x-purple-badge>Excellent</x-purple-badge>
+    @break
+@endswitch
